@@ -1,80 +1,58 @@
+#!/usr/bin/env python3
 import yt_dlp
 import argparse
 import os
 
-# cria parser CLI
+# 1. Configuração de caminhos robusta
+home_path = os.path.expanduser("~")
+downloads_path = os.path.join(home_path, "Downloads")
+
+# Garante que a pasta existe no Kali/Linux
+if not os.path.exists(downloads_path):
+    os.makedirs(downloads_path, exist_ok=True)
+
 parser = argparse.ArgumentParser(
     prog="ytdl",
-    description="Simple YouTube downloader CLI made with Python"
+    description="Simple YouTube downloader CLI"
 )
 
-# argumento URL
-parser.add_argument(
-    "-u",
-    "--url",
-    help="URL da música ou vídeo"
-)
+parser.add_argument("-u", "--url", help="URL da música ou vídeo")
+parser.add_argument("-f", "--file", help="Arquivo contendo URLs")
+parser.add_argument("-o", "--output", help="Diretório de destino")
 
-# argumento arquivo/wordlist
-parser.add_argument(
-    "-f",
-    "--file",
-    help="Arquivo contendo URLs"
-)
-
-# argumento diretório de download
-parser.add_argument(
-    "-o",
-    "--output",
-    help="Diretório onde os downloads serão salvos"
-)
-
-# pega argumentos
 args = parser.parse_args()
 
-# pega pasta Downloads do Windows
-downloads_path = os.path.join(
-    os.path.expanduser("~"),
-    "Downloads"
-)
+# Define local de saída usando o separador correto do SO
+final_output = args.output if args.output else downloads_path
+output_template = os.path.join(final_output, '%(title)s.%(ext)s')
 
-# local padrão
-output_path = f'{downloads_path}/%(title)s.%(ext)s'
-
-# se usuário escolher outro diretório
-if args.output:
-    output_path = f'{args.output}/%(title)s.%(ext)s'
-
-# opções yt-dlp
 opcoes = {
     'format': 'bestaudio/best',
-
+    'quiet': False, # Coloque True se quiser um terminal limpo
     'postprocessors': [{
         'key': 'FFmpegExtractAudio',
         'preferredcodec': 'mp3',
         'preferredquality': '192',
     }],
-
-    'outtmpl': output_path
+    'outtmpl': output_template
 }
 
-# inicia yt-dlp
-with yt_dlp.YoutubeDL(opcoes) as ydl:
+def executar_download(link):
+    try:
+        with yt_dlp.YoutubeDL(opcoes) as ydl:
+            ydl.download([link.strip()])
+    except Exception as e:
+        print(f"Erro no link {link}: {e}")
 
-    # download URL única
-    if args.url:
-        ydl.download([args.url])
-
-    # download wordlist
-    elif args.file:
-
+if args.url:
+    executar_download(args.url)
+elif args.file:
+    if os.path.exists(args.file):
         with open(args.file, 'r') as arquivo:
-
-            urls = arquivo.readlines()
-
-            for url in urls:
-                ydl.download([url.strip()])
-
-    # caso usuário não use argumentos
+            for linha in arquivo:
+                if linha.strip():
+                    executar_download(linha)
     else:
-        print("Use -u para URL ou -f para arquivo")
+        print("Arquivo de lista não encontrado.")
+else:
+    parser.print_help()
